@@ -2,6 +2,7 @@ examples/
 [lL]ogs/
 ckpts/*
 .vscode/
+CLAUDE.md
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[codz]
