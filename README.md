@@ -25,8 +25,8 @@
 
 ```bash
 # 克隆项目
-git clone https://github.com/yourusername/voiceinput.git
-cd voiceinput
+git clone https://github.com/yanghan-cyber/VoiceFlow.git
+cd VoiceFlow
 
 # 安装依赖
 pip install -r requirements.txt
@@ -264,8 +264,8 @@ A: 可以尝试以下镜像源或手动下载：
 
 ```bash
 # 克隆项目
-git clone https://github.com/yourusername/voiceinput.git
-cd voiceinput
+git clone https://github.com/yanghan-cyber/VoiceFlow.git
+cd VoiceFlow
 
 # 创建虚拟环境
 python -m venv venv
