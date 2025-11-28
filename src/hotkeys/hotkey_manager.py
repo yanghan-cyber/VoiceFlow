@@ -1,13 +1,7 @@
-"""
-全局快捷键管理器 - 防抖增强版
-修复了长按 F2 并在回调中模拟打字时，导致按键状态重置的问题。
-"""
-
 import threading
 import time
-import platform
-import os
-from typing import Callable, Dict, Optional, Set
+import sys
+from typing import Callable, Dict, Set
 from enum import Enum
 
 from utils import get_logger
@@ -28,207 +22,158 @@ class HotkeyType(Enum):
 
 
 class HotkeyManager:
-    """全局快捷键管理器 (带松开防抖)"""
+    """
+    全局快捷键管理器 (状态差分版)
+    核心逻辑：维护一个 active_combos 集合。
+    - 每次按键变化时，检查注册的组合键状态。
+    - 从 False -> True : 触发 PRESS / 启动长按定时器
+    - 从 True -> False : 触发 RELEASE / 取消长按定时器
+    
+    解决了“同时松开两个键导致触发两次 Release”的问题，因为状态移除是原子的。
+    """
 
     def __init__(self):
         self.logger = get_logger("HotkeyManager")
         
-        # 回调存储
+        # 快捷键注册表: {'ctrl+f2': {Type.PRESS: func, ...}}
         self.hotkey_callbacks: Dict[str, Dict[HotkeyType, Callable]] = {}
-
-        self.pressed_keys: Set[str] = set()
-        self.long_press_timers: Dict[str, threading.Timer] = {}
-        self.long_press_triggered: Set[str] = set()
         
-        # 【新增】松开防抖定时器
-        # key: 物理按键名, value: Timer
-        self.release_debounce_timers: Dict[str, threading.Timer] = {}
+        # 当前激活的组合键集合 (防止重复触发)
+        self.active_combos: Set[str] = set()
+        
+        # 长按定时器
+        self.long_press_timers: Dict[str, threading.Timer] = {}
         
         self.is_listening = False
-        self.listener_thread: Optional[threading.Thread] = None
         self._lock = threading.Lock()
 
-    def is_supported(self) -> bool:
-        if not KEYBOARD_AVAILABLE: return False
-        if platform.system() == 'Linux':
-            try:
-                if os.geteuid() != 0: return False
-            except AttributeError: pass
-        return True
-
-    def add_hotkey(self, hotkey: str, callback: Callable,
-                   hotkey_type: HotkeyType = HotkeyType.PRESS) -> bool:
-        if not KEYBOARD_AVAILABLE: return False
+    def add_hotkey(self, hotkey: str, callback: Callable, hotkey_type: HotkeyType):
+        if not KEYBOARD_AVAILABLE: return
         with self._lock:
-            norm_key = self._normalize_hotkey(hotkey)
+            # 规范化键名 (如 'Ctrl + F2' -> 'ctrl+f2')
+            try:
+                # keyboard.parse_hotkey 返回的是 tuple，我们需要转回标准字符串
+                # 或者直接用 keyboard.normalize_name (注意：normalize_name处理单个键较好，组合键最好自己标准化)
+                # 这里为了简单，手动处理一下空格和大小写
+                norm_key = hotkey.lower().replace(' ', '')
+                # 再次利用 keyboard 自身的逻辑确保顺序一致 (ctrl+alt vs alt+ctrl)
+                # 但 keyboard 没有直接暴露 normalize_hotkey_string，只要我们自己保持 consistent 即可
+                if '+' in norm_key:
+                    parts = sorted(norm_key.split('+'))
+                    norm_key = '+'.join(parts)
+            except:
+                norm_key = hotkey.lower()
+
             if norm_key not in self.hotkey_callbacks:
                 self.hotkey_callbacks[norm_key] = {}
             self.hotkey_callbacks[norm_key][hotkey_type] = callback
-            self.logger.info(f"注册快捷键: {norm_key} [{hotkey_type.value}]")
-            return True
+            self.logger.info(f"注册: {norm_key} -> {hotkey_type.value}")
 
-    def start_listening(self) -> bool:
-        if not self.is_supported() or self.is_listening: return False
-        try:
-            self.pressed_keys.clear()
-            self.long_press_timers.clear()
-            self.long_press_triggered.clear()
-            self.release_debounce_timers.clear()
+    def start(self):
+        """兼容旧接口"""
+        self.start_listening()
 
-            keyboard.hook(self._on_keyboard_event)
-            
-            self.is_listening = True
-            self.listener_thread = threading.Thread(target=self._listen_loop, daemon=True)
-            self.listener_thread.start()
-            self.logger.info("开始监听 (防抖模式)...")
-            return True
-        except Exception as e:
-            self.logger.error(f"启动监听失败: {e}")
-            return False
+    def start_listening(self):
+        if not KEYBOARD_AVAILABLE or self.is_listening: return
+        self.is_listening = True
+        self.active_combos.clear()
+        # 监听所有键盘事件
+        keyboard.hook(self._on_event)
+        self.logger.info("🎹 键盘监听已启动")
 
     def stop_listening(self):
         if not self.is_listening: return
         self.is_listening = False
         keyboard.unhook_all()
         with self._lock:
-            for t in self.long_press_timers.values(): t.cancel()
-            for t in self.release_debounce_timers.values(): t.cancel()
+            for t in self.long_press_timers.values():
+                t.cancel()
             self.long_press_timers.clear()
-            self.release_debounce_timers.clear()
+            self.active_combos.clear()
 
-    def _listen_loop(self):
-        while self.is_listening: time.sleep(0.5)
-
-    def _normalize_hotkey(self, hotkey: str) -> str:
-        replacements = {
-            'lctrl': 'ctrl', 'rctrl': 'ctrl', 'left ctrl': 'ctrl', 'right ctrl': 'ctrl', 'control': 'ctrl',
-            'lalt': 'alt', 'ralt': 'alt', 'left alt': 'alt', 'right alt': 'alt', 'option': 'alt',
-            'lshift': 'shift', 'rshift': 'shift', 'left shift': 'shift', 'right shift': 'shift',
-            'lwin': 'windows', 'rwin': 'windows', 'left windows': 'windows', 'right windows': 'windows', 'win': 'windows',
-            'esc': 'esc', 'escape': 'esc'
-        }
-        parts = hotkey.lower().replace(' ', '').split('+')
-        normalized_parts = [replacements.get(p, p) for p in parts]
-        return '+'.join(sorted(normalized_parts))
-
-    def _get_current_combo(self) -> str:
-        return '+'.join(sorted(self.pressed_keys))
-
-    def _on_keyboard_event(self, event):
-        try:
-            raw_name = event.name.lower()
-            remap = {
-                'left ctrl': 'ctrl', 'right ctrl': 'ctrl', 'control': 'ctrl',
-                'left shift': 'shift', 'right shift': 'shift',
-                'left alt': 'alt', 'right alt': 'alt',
-                'left windows': 'windows', 'right windows': 'windows', 'win': 'windows'
-            }
-            key_name = remap.get(raw_name, raw_name)
-            
-            with self._lock:
-                if event.event_type == 'down':
-                    self._handle_press(key_name)
-                elif event.event_type == 'up':
-                    self._handle_release(key_name)
-        except Exception as e:
-            self.logger.error(f"Event Error: {e}")
-
-    def _handle_press(self, key_name: str):
-        # 【防抖逻辑 1】如果这个键正在等待“确认松开”，说明它是抖动或重复，取消松开逻辑
-        if key_name in self.release_debounce_timers:
-            self.release_debounce_timers[key_name].cancel()
-            del self.release_debounce_timers[key_name]
-            # 既然取消了松开，说明键一直按着，不需要重新触发 Press 逻辑，直接返回
-            return
-
-        # 常规重复检测
-        if key_name in self.pressed_keys:
-            return
+    def _on_event(self, event):
+        """
+        核心事件循环：不依赖 event.name 判断，而是直接轮询 active_combos 状态变化
+        这样可以避免因 event 顺序导致的逻辑错误。
+        """
+        if not self.is_listening: return
         
-        self.pressed_keys.add(key_name)
-        current_combo = self._get_current_combo()
+        # 为了不阻塞钩子，快速处理。
+        # 这里虽然有循环，但注册的快捷键数量通常很少（1-5个），所以开销极小。
         
-        if current_combo in self.hotkey_callbacks:
-            callbacks = self.hotkey_callbacks[current_combo]
+        # 1. 检查是否有新激活的组合键
+        for combo in self.hotkey_callbacks:
+            # 使用 keyboard.is_pressed 精准判断组合键物理状态
+            if keyboard.is_pressed(combo):
+                if combo not in self.active_combos:
+                    self._on_combo_down(combo)
+        
+        # 2. 检查已激活的组合键是否释放
+        # 使用 list() 拷贝一份，因为循环中可能会 remove
+        for combo in list(self.active_combos):
+            if not keyboard.is_pressed(combo):
+                self._on_combo_up(combo)
+
+    def _on_combo_down(self, combo):
+        with self._lock:
+            if combo in self.active_combos: return
+            self.active_combos.add(combo)
             
+            callbacks = self.hotkey_callbacks.get(combo, {})
+            
+            # 触发 Press
             if HotkeyType.PRESS in callbacks:
-                try: callbacks[HotkeyType.PRESS]()
-                except Exception as e: self.logger.error(f"Press Err: {e}")
+                self._async_run(callbacks[HotkeyType.PRESS], f"Press-{combo}")
 
+            # 启动长按计时
             if HotkeyType.LONG_PRESS in callbacks:
-                if current_combo in self.long_press_timers:
-                    self.long_press_timers[current_combo].cancel()
-                
                 timer = threading.Timer(
-                    0.8, 
-                    self._trigger_long_press, 
-                    args=[current_combo, callbacks[HotkeyType.LONG_PRESS]]
+                    0.5, # 长按判定时间 0.5s
+                    self._trigger_long_press,
+                    args=(combo, callbacks[HotkeyType.LONG_PRESS])
                 )
                 timer.start()
-                self.long_press_timers[current_combo] = timer
+                self.long_press_timers[combo] = timer
 
-    def _handle_release(self, key_name: str):
-        if key_name not in self.pressed_keys:
-            return
-
-        # 获取当前的 combo，用于稍后回调
-        prev_combo = self._get_current_combo()
-
-        # 【防抖逻辑 2】不要立即处理，而是启动一个短定时器 (50ms)
-        # 如果 50ms 内 key 又被 press 了，这个 timer 会被 cancel
-        if key_name in self.release_debounce_timers:
-            self.release_debounce_timers[key_name].cancel()
-        
-        timer = threading.Timer(
-            0.2, # 50ms 防抖延迟
-            self._finalize_release,
-            args=[key_name, prev_combo]
-        )
-        timer.start()
-        self.release_debounce_timers[key_name] = timer
-
-    def _finalize_release(self, key_name: str, prev_combo: str):
-        """真正的松开逻辑，由定时器触发"""
+    def _on_combo_up(self, combo):
         with self._lock:
-            # 清理 timer 引用
-            if key_name in self.release_debounce_timers:
-                del self.release_debounce_timers[key_name]
+            if combo not in self.active_combos: return
+            self.active_combos.remove(combo) # 立即移除，防止双重触发
             
-            # 真正移除按键
-            if key_name in self.pressed_keys:
-                self.pressed_keys.remove(key_name)
-            else:
-                return # 已经被处理过了
+            callbacks = self.hotkey_callbacks.get(combo, {})
 
-            # 触发回调
-            if prev_combo in self.hotkey_callbacks:
-                callbacks = self.hotkey_callbacks[prev_combo]
-                
-                # 清理长按定时器
-                if prev_combo in self.long_press_timers:
-                    self.long_press_timers[prev_combo].cancel()
-                    del self.long_press_timers[prev_combo]
-
-                if HotkeyType.RELEASE in callbacks:
-                    try: callbacks[HotkeyType.RELEASE]()
-                    except Exception as e: self.logger.error(f"Release Err: {e}")
-
-            if prev_combo in self.long_press_triggered:
-                self.long_press_triggered.remove(prev_combo)
-
-    def _trigger_long_press(self, combo: str, callback: Callable):
-        with self._lock:
-            current = self._get_current_combo()
-            if current == combo:
-                try:
-                    self.logger.info(f"触发长按: {combo}")
-                    callback()
-                    self.long_press_triggered.add(combo)
-                except Exception as e:
-                    self.logger.error(f"LongPress Err: {e}")
-            
+            # 停止长按计时（如果还在跑）
             if combo in self.long_press_timers:
+                self.long_press_timers[combo].cancel()
                 del self.long_press_timers[combo]
 
-    def get_registered_hotkeys(self) -> Dict[str, list]:
-        return {k: list(v.keys()) for k, v in self.hotkey_callbacks.items()}
+            # 触发 Release
+            # 注意：如果刚才触发了长按，这里依然会触发 Release (Stop)
+            # 这是符合逻辑的：长按开始录音 -> 松开停止录音
+            if HotkeyType.RELEASE in callbacks:
+                self._async_run(callbacks[HotkeyType.RELEASE], f"Release-{combo}")
+
+    def _trigger_long_press(self, combo, callback):
+        """长按定时器触发"""
+        with self._lock:
+            # 双重检查：防止定时器刚好到期时，用户松手了
+            if combo not in self.active_combos:
+                return
+            
+            # 移除 timer 引用
+            if combo in self.long_press_timers:
+                del self.long_press_timers[combo]
+            
+            self._async_run(callback, f"LongPress-{combo}")
+
+    def _async_run(self, func, name):
+        """独立线程运行回调"""
+        def wrapper():
+            try:
+                func()
+            except Exception as e:
+                self.logger.error(f"回调错误 [{name}]: {e}")
+        threading.Thread(target=wrapper, daemon=True).start()
+
+    # 兼容代码
+    def is_supported(self): return KEYBOARD_AVAILABLE

@@ -1,10 +1,15 @@
 # config/models.yaml
 
 app:
-  # 运行模式: 
+  # 运行模式:
   # "stream"  : 边录边识别 (流式)
   # "offline" : 录音结束后统一识别 (非流式/整句识别)
   mode: "stream"
+
+  # 快捷键配置
+  hotkey:
+    key_combination: "ctrl+f2"  # 开始/停止录音的快捷键
+    exit_key: "esc"              # 退出程序的按键
 
 
 asr:

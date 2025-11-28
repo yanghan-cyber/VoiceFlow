@@ -1,6 +1,10 @@
 examples/
 [lL]ogs/
+
+# CKPTS 目录：保留结构，但忽略模型文件
 ckpts/*
+!ckpts/**/.gitkeep
+
 .vscode/
 CLAUDE.md
 # Byte-compiled / optimized / DLL files
