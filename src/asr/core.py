@@ -35,25 +35,22 @@ class ASRFactory:
         full_config = ASRFactory._load_config(config_path)
         asr_config = full_config.get('asr', {})
         engine_type = asr_config.get('active_engine', 'sherpa_onnx')
-        
+
         if engine_type == "sherpa_onnx":
             sherpa_cfg = asr_config.get('sherpa_onnx', {})
             # 获取模型类型: paraformer 或 sense_voice
             model_type = sherpa_cfg.get('model_type', 'paraformer')
-            
-            # 获取标点配置 (通用)
-            punct_params = sherpa_cfg.get('punctuation', {'enabled': False})
 
             if model_type == 'paraformer':
                 from .sherpa_impl import SherpaOnnxASR
                 paraformer_params = sherpa_cfg.get('paraformer', {})
-                return SherpaOnnxASR(config=paraformer_params, punct_config=punct_params)
-            
+                return SherpaOnnxASR(config=paraformer_params)
+
             elif model_type == 'sense_voice':
                 from .sherpa_sense_voice_impl import SherpaSenseVoiceASR
                 sense_params = sherpa_cfg.get('sense_voice', {})
-                return SherpaSenseVoiceASR(config=sense_params, punct_config=punct_params)
-            
+                return SherpaSenseVoiceASR(config=sense_params)
+
             else:
                 raise ValueError(f"不支持的 Sherpa 模型类型: {model_type}")
         else:

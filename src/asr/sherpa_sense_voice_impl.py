@@ -17,11 +17,10 @@ logger = get_logger("SherpaSenseVoiceASR")
 
 
 class SherpaSenseVoiceASR(ASRBase):
-    def __init__(self, config: dict, punct_config: dict = None):
+    def __init__(self, config: dict):
         """
         初始化 SenseVoice ASR (非流式模型 + VAD 实现伪流式)
         :param config: 包含模型路径、VAD配置、热词配置的字典
-        :param punct_config: (已弃用) SenseVoice 自带标点，忽略此参数
         """
         super().__init__()
 
@@ -77,7 +76,7 @@ class SherpaSenseVoiceASR(ASRBase):
             logger.warning("⚠️ 警告: 未找到 VAD 模型，系统将自动降级为 [Offline模式]")
             logger.info("   (在录音过程中不会有实时文字，只有停止录音后才会输出结果)")
         else:
-            vad_type = vad_params.get("type", "silero_vad")
+            vad_type = vad_params.get("type", "ten_vad")
             logger.info(f"正在加载 VAD 模型 ({vad_type})...")
 
             vad_config = sherpa_onnx.VadModelConfig()

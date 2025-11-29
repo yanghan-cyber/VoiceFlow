@@ -13,7 +13,7 @@ app:
   mode: "stream"   # 普通模式的默认行为 (stream/offline)
   hotkeys:
     std: "ctrl+f2" # 普通录音
-    llm: "ctrl+f3" # AI 录音
+    llm: "ctrl+f1" # AI 录音
 
 llm:
   # 服务商 Base URL (例如本地 vLLM, DeepSeek, 硅基流动, OpenAI)
@@ -49,6 +49,10 @@ asr:
       tokens: "./ckpts/sherpa-onnx-streaming-paraformer-bilingual-zh-en/tokens.txt"
       encoder: "./ckpts/sherpa-onnx-streaming-paraformer-bilingual-zh-en/encoder.int8.onnx"
       decoder: "./ckpts/sherpa-onnx-streaming-paraformer-bilingual-zh-en/decoder.int8.onnx"
+      # 标点恢复模型（仅 paraformer 需要，sense_voice 自带标点）
+      punctuation:
+        enabled: true  # 是否启用自动标点
+        model: "./ckpts/sherpa-onnx-punct-ct-transformer-zh-en-vocab272727-2024-04-12/model.onnx"
 
     sense_voice:
       # 多语言模型路径 (支持中/英/日/韩/粤语)
@@ -56,15 +60,9 @@ asr:
       tokens: "./ckpts/sherpa-onnx-sense-voice-zh-en-ja-ko-yue-2024-07-17/tokens.txt"
       language: "auto"  # auto/zh/en/ja/ko/yue
       use_itn: true     # 逆文本标准化（如：一二三 -> 123）
-
-    # 标点恢复模型 ----------------------------------------------
-    punctuation:
-      enabled: true  # 是否启用自动标点
-      model: "./ckpts/sherpa-onnx-punct-ct-transformer-zh-en-vocab272727-2024-04-12/model.onnx"
-
-    # VAD (语音活动检测) 模型路径 -----------------------------
-    vad:
-      model: "./ckpts/vad/ten-vad.onnx"
+      # VAD (语音活动检测) 配置（仅 sense_voice 需要）
+      vad:
+        model: "./ckpts/vad/ten-vad.onnx"
 
     # 热词配置 -------------------------------------------------
     hr_dict_dir: "./ckpts/hr-files/dict"

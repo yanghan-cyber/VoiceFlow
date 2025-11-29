@@ -102,8 +102,6 @@ class LLMOptimizer:
             
             # 提取结果
             content = response.choices[0].message.content.strip()
-            
-
             if not content:
                 return text
             logger.info(f"LLM 优化: [原] {text} -> [新] {content}")

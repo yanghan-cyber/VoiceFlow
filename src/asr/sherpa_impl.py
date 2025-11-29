@@ -18,10 +18,9 @@ logger = get_logger("SherpaOnnxASR")
 
 
 class SherpaOnnxASR(ASRBase):
-    def __init__(self, config: dict, punct_config: dict = None):
+    def __init__(self, config: dict):
         """
-        :param config: ASR 模型参数 (Paraformer)
-        :param punct_config: 标点模型参数
+        :param config: ASR 模型参数 (Paraformer)，包含 punctuation 配置
         """
         super().__init__()
 
@@ -55,9 +54,10 @@ class SherpaOnnxASR(ASRBase):
             logger.error(f"❌ ASR 初始化失败: {e}")
             raise e
 
-        # 2. 初始化标点模型 (新增)
+        # 2. 初始化标点模型 (从 config 内部读取 punctuation 配置)
         self.punct = None
-        if punct_config and punct_config.get("enabled", False):
+        punct_config = config.get("punctuation", {})
+        if punct_config.get("enabled", False):
             logger.info("正在加载标点恢复模型...")
             punct_model_path = punct_config.get("model")
             if not os.path.exists(punct_model_path):

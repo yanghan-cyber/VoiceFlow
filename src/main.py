@@ -236,7 +236,7 @@ def main():
     hm.start_listening()
     
     try:
-        keyboard.wait('esc')
+        keyboard.wait('ctrl+shift+esc')
     except KeyboardInterrupt:
         pass
     finally:
