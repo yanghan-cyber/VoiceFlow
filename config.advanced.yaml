@@ -1,0 +1,103 @@
+# config/models.yaml
+
+app:
+  # 运行模式:
+  # "stream"  : 边录边识别 (流式)
+  # "offline" : 录音结束后统一识别 (非流式/整句识别)
+  mode: "offline"
+
+  # 快捷键配置
+  hotkey:
+    key_combination: "ctrl+f2"  # 开始/停止录音的快捷键
+    exit_key: "ctrl+esc"              # 退出程序的按键
+
+
+asr:
+  # 当前使用的引擎
+  active_engine: "sherpa_onnx"
+  
+  # Sherpa Onnx 相关配置
+  sherpa_onnx:
+    model_type: "sense_voice" #   标识使用 paraformer 或 sense_voice 模型
+    
+    # 下面的参数将直接传递给 OnlineRecognizer.from_paraformer
+    paraformer:
+      # 模型路径 (建议使用绝对路径，或者相对于执行目录的路径)
+      tokens: "./ckpts/sherpa-onnx-streaming-paraformer-bilingual-zh-en/tokens.txt"
+      encoder: "./ckpts/sherpa-onnx-streaming-paraformer-bilingual-zh-en/encoder.int8.onnx"
+      decoder: "./ckpts/sherpa-onnx-streaming-paraformer-bilingual-zh-en/decoder.int8.onnx"
+      
+      # 性能与线程
+      num_threads: 1
+      provider: "cpu"  # 或 "cuda"
+      device: 0        # GPU 索引
+      
+      # 音频参数
+      sample_rate: 16000
+      feature_dim: 80
+      
+      # 端点检测 (VAD) 配置
+      # **参数说明：**  
+      #- `enable_endpoint_detection`:  
+      #  `True`：启用端点检测功能；`False`：禁用端点检测功能。  
+      #- `rule1_min_trailing_silence`:  
+      #  仅当 `enable_endpoint_detection` 的值为 `True` 时才会被使用。如果连续的“静默”（无声数据）时段的持续时间（以秒为单位）超过这个值，系统会认为检测到了一个端点。  
+      #- `rule2_min_trailing_silence`:  
+      #  仅当 `enable_endpoint_detection` 的值为 `True` 时才会被使用。如果我们解码到的数据包含非静默（有声音）内容，并且连续的“静默”时段的持续时间超过这个值，系统也会认为检测到了一个端点。
+      enable_endpoint_detection: true 
+      rule1_min_trailing_silence: 2.4
+      rule2_min_trailing_silence: 1.2
+      rule3_min_utterance_length: 30
+      
+      # 解码配置
+      decoding_method: "greedy_search" # 或 "modified_beam_search"
+      
+      # 调试
+      debug: false
+      
+      # 热词与高级规则 (留空即可)
+      rule_fsts: ""
+      rule_fars: ""
+      hr_dict_dir: "./ckpts/hr-files/dict"
+      # hr_rule_fsts: "./ckpts/hr-files/replace.fst" # 用这个后，英文会没有空格
+      hr_lexicon: "./ckpts/hr-files/lexicon.txt"
+
+
+    # === 【新增】SenseVoice 配置 ===
+    sense_voice:
+      model: "./ckpts/sherpa-onnx-sense-voice-zh-en-ja-ko-yue-2024-07-17/model.onnx"
+      tokens: "./ckpts/sherpa-onnx-sense-voice-zh-en-ja-ko-yue-2024-07-17/tokens.txt"
+      language: "auto"
+      num_threads: 1
+      use_itn: true        # 是否启用逆文本标准化 (比如把"一二三"转为"123")
+      debug: false
+      provider: "cpu"
+      device: 0
+      
+      # 【热词配置】
+      hr_dict_dir: "./ckpts/hr-files/dict"
+      # hr_rule_fsts: "./ckpts/hr-files/replace.fst"  # 用这个后，英文会没有空格
+      hr_lexicon: "./ckpts/hr-files/lexicon.txt"
+
+
+    # VAD 详细配置
+      vad:
+        # 类型: "silero_vad" 或 "ten_vad"
+        type: "ten_vad" 
+        
+        # 模型路径
+        model: "./ckpts/vad/ten-vad.onnx"
+        
+        # VAD 核心参数 (带默认值)
+        threshold: 0.5
+        min_silence_duration: 0.1
+        min_speech_duration: 0.25
+        max_speech_duration: 5.0
+        window_size: 512 
+
+    # 标点模型配置
+    punctuation:
+      enabled: true  # 开关
+      model: "./ckpts/sherpa-onnx-punct-ct-transformer-zh-en-vocab272727-2024-04-12/model.onnx"
+      num_threads: 1
+      provider: "cpu"

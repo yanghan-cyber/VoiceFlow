@@ -37,6 +37,19 @@ class SherpaOnnxASR(ASRBase):
 
         logger.info("正在加载 Sherpa-Onnx ASR 模型...")
         try:
+            # 为参数添加默认值（这些已从 config.yaml 中移除）
+            config.setdefault("num_threads", 1)
+            config.setdefault("provider", "cpu")
+            config.setdefault("device", 0)
+            config.setdefault("sample_rate", 16000)
+            config.setdefault("feature_dim", 80)
+            config.setdefault("enable_endpoint_detection", True)
+            config.setdefault("rule1_min_trailing_silence", 2.4)
+            config.setdefault("rule2_min_trailing_silence", 1.2)
+            config.setdefault("rule3_min_utterance_length", 30)
+            config.setdefault("decoding_method", "greedy_search")
+            config.setdefault("debug", False)
+
             self.recognizer = sherpa_onnx.OnlineRecognizer.from_paraformer(**config)
         except Exception as e:
             logger.error(f"❌ ASR 初始化失败: {e}")
