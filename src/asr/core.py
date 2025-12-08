@@ -34,6 +34,7 @@ class ASRFactory:
     def get_asr_engine(config_path: str = "config.yaml") -> ASRBase:
         full_config = ASRFactory._load_config(config_path)
         asr_config = full_config.get('asr', {})
+        hotwords = asr_config.get('hotwords', [])
         engine_type = asr_config.get('active_engine', 'sherpa_onnx')
 
         if engine_type == "sherpa_onnx":
@@ -44,7 +45,7 @@ class ASRFactory:
             if model_type == 'paraformer':
                 from .sherpa_impl import SherpaOnnxASR
                 paraformer_params = sherpa_cfg.get('paraformer', {})
-                return SherpaOnnxASR(config=paraformer_params)
+                return SherpaOnnxASR(config=paraformer_params, hotwords=hotwords)
 
             elif model_type == 'sense_voice':
                 from .sherpa_sense_voice_impl import SherpaSenseVoiceASR

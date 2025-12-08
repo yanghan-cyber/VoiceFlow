@@ -49,7 +49,11 @@ class SherpaOnnxASR(ASRBase):
             config.setdefault("decoding_method", "greedy_search")
             config.setdefault("debug", False)
 
-            self.recognizer = sherpa_onnx.OnlineRecognizer.from_paraformer(**config)
+            # 移除 punctuation 键，因为 from_paraformer 不接受该参数
+            config_for_recognizer = config.copy()
+            config_for_recognizer.pop("punctuation", None)
+
+            self.recognizer = sherpa_onnx.OnlineRecognizer.from_paraformer(**config_for_recognizer)
         except Exception as e:
             logger.error(f"❌ ASR 初始化失败: {e}")
             raise e
