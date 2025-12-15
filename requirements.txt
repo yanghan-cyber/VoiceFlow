@@ -34,3 +34,7 @@ scipy
 ffmpeg-python
 python-multipart 
 loguru
+
+funasr
+torch
+torchaudio

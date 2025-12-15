@@ -28,11 +28,11 @@ class TextTyper:
         """带重试机制的粘贴操作，防止剪贴板由于占用而失败"""
         for i in range(retries):
             try:
-                # 1. 保存旧剪贴板
-                try:
-                    original_clipboard = pyclip.paste(text=False)
-                except Exception:
-                    original_clipboard = None
+                # # 1. 保存旧剪贴板
+                # try:
+                #     original_clipboard = pyclip.paste(text=False)
+                # except Exception:
+                #     original_clipboard = None
                 
                 # 2. 写入新内容
                 # 注意：某些系统下，copy需要一点时间生效
@@ -43,16 +43,16 @@ class TextTyper:
                 keyboard.send('ctrl+v')
                 time.sleep(0.05) # 等待粘贴动作完成
 
-                # 4. 恢复旧剪贴板 (可选，为了不干扰用户体验)
-                if original_clipboard:
-                    # pyclip.paste 返回 bytes，copy 需要 str (utf-8) 或 bytes
-                    content = original_clipboard
-                    if isinstance(content, bytes):
-                        try:
-                            content = content.decode('utf-8')
-                        except:
-                            pass # 如果是二进制数据，直接传bytes通常也可以，或者就放弃恢复
-                    pyclip.copy(content)
+                # # 4. 恢复旧剪贴板 (可选，为了不干扰用户体验)
+                # if original_clipboard:
+                #     # pyclip.paste 返回 bytes，copy 需要 str (utf-8) 或 bytes
+                #     content = original_clipboard
+                #     if isinstance(content, bytes):
+                #         try:
+                #             content = content.decode('utf-8')
+                #         except:
+                #             pass # 如果是二进制数据，直接传bytes通常也可以，或者就放弃恢复
+                #     pyclip.copy(content)
                 
                 return # 成功则退出
             except Exception as e:
