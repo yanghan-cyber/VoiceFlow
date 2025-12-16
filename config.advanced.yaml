@@ -14,7 +14,7 @@ app:
     exit_key: "ctrl+esc"  # 退出程序的按键
 
   # ASR 模型选择 (与主配置一致)
-  asr_model: "sense_voice"  # paraformer / sense_voice
+  asr_model: "sense_voice"  # paraformer / sense_voice / funasr
 
 # =============================================================================
 # ASR 高级配置 - 模型路径和详细参数
@@ -50,6 +50,24 @@ asr:
         min_silence_duration: 0.1
         min_speech_duration: 0.25
         max_speech_duration: 5.0
+        window_size: 512
+
+    funasr:
+      # FunASR 模型配置 - 仅 model_dir 可配置，其他参数固定
+      model_dir: "FunAudioLLM/Fun-ASR-Nano-2512"  # 模型目录（唯一可配置参数）
+      device: "cuda"          # 设备: cuda:0 / cpu
+      sample_rate: 16000      # 采样率
+      chunk_size: 1000        # 流式块大小(毫秒)
+      enable_vad: true        # 是否启用VAD（流式模式）
+      num_threads: 4          # CPU线程数
+
+      # VAD 配置（用于流式模式，与sense_voice类似）
+      vad_model: "ten-vad"    # VAD模型: ten-vad / silero-vad
+      vad_kwargs:
+        threshold: 0.5
+        min_silence_duration: 0.1
+        min_speech_duration: 0.25
+        max_speech_duration: 8.0
         window_size: 512
 
   # =============================================================================

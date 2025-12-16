@@ -10,13 +10,13 @@
 # ========================================================
 
 app:
-  mode: "offline"   # 运行模式: stream(流式)/offline(离线)
+  mode: "stream"   # 运行模式: stream(流式)/offline(离线)
   hotkeys:
     std: "ctrl+f2" # 普通录音快捷键
     llm: "ctrl+f1" # AI 录音快捷键
 
   # ASR 模型选择
-  asr_model: "sense_voice"  # 可选: paraformer(流式)/sense_voice(多语言)
+  asr_model: "funasr"  # 可选: paraformer(流式)/sense_voice(多语言)/funasr
 
 llm:
   # 服务商 Base URL (例如本地 vLLM, DeepSeek, 硅基流动, OpenAI)

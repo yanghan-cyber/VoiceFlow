@@ -144,5 +144,35 @@ class ASRFactory:
                 sense_params.update(hotword_params)
             return SherpaSenseVoiceASR(config=sense_params)
 
+        elif asr_model == "funasr":
+            from .funasr_impl import FunASRASR
+            # 优先使用高级配置中的详细参数
+            if 'asr' in config and 'models' in config['asr'] and 'funasr' in config['asr']['models']:
+                funasr_params = config['asr']['models']['funasr'].copy()
+                # 添加性能参数和VAD参数
+                if 'performance' in config['asr']:
+                    performance = config['asr']['performance']
+                    for key in ['num_threads', 'device', 'sample_rate']:
+                        if key in performance:
+                            funasr_params[key] = performance[key]
+            else:
+                # 使用默认配置
+                funasr_params = {
+                    'model_dir': "FunAudioLLM/Fun-ASR-Nano-2512",
+                    'device': "cuda:0",
+                    'sample_rate': 16000,
+                    'chunk_size': 1000,
+                    'enable_vad': True,
+                    'num_threads': 4
+                }
+            # 添加热词配置（只添加必要的参数）
+            if hotwords_config:
+                hotword_params = {}
+                for key in ['hr_dict_dir', 'hr_lexicon', 'rule_fsts', 'rule_fars']:
+                    if key in hotwords_config:
+                        hotword_params[key] = hotwords_config[key]
+                funasr_params.update(hotword_params)
+            return FunASRASR(config=funasr_params)
+
         else:
             raise ValueError(f"不支持的 ASR 模型类型: {asr_model}")

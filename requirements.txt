@@ -1,5 +1,5 @@
 --extra-index-url https://k2-fsa.github.io/sherpa/onnx/cuda.html
-
+--extra-index-url https://download.pytorch.org/whl/cu128
 # 语音识别和音频处理
 librosa==0.11.0
 numba==0.61.2
@@ -36,5 +36,5 @@ python-multipart
 loguru
 
 funasr
-torch
-torchaudio
+torch==2.9.1
+torchaudio==2.9.1
